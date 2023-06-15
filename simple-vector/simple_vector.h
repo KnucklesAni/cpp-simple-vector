@@ -44,6 +44,28 @@ public:
     std::copy(init.begin(), init.end(), items_.Get());
   }
 
+  SimpleVector(const SimpleVector &other) : SimpleVector(other.size_) {
+    if (!other.IsEmpty()) {
+      std::copy(other.begin(), other.end(), items_.Get());
+    }
+  }
+
+  SimpleVector(SimpleVector &&other) noexcept
+      : items_(std::move(other.items_)), size_(other.size_),
+        capacity_(other.capacity_) {
+    other.size_ = 0;
+    other.capacity_ = 0;
+  }
+
+  SimpleVector &operator=(const SimpleVector &rhs) {
+    if (this == &rhs) {
+      return *this;
+    }
+    SimpleVector new_vector(rhs);
+    swap(new_vector);
+    return *this;
+  }
+
   // Возвращает количество элементов в массиве
   size_t GetSize() const noexcept { return size_; }
 
@@ -54,7 +76,10 @@ public:
   bool IsEmpty() const noexcept { return size_ == 0; }
 
   // Возвращает ссылку на элемент с индексом index
-  Type &operator[](size_t index) noexcept { return items_[index]; }
+  Type &operator[](size_t index) noexcept {
+    assert(index < size_);
+    return items_[index];
+  }
 
   // Возвращает константную ссылку на элемент с индексом index
   const Type &operator[](size_t index) const noexcept { return items_[index]; }
@@ -103,11 +128,11 @@ public:
 
   // Возвращает итератор на начало массива
   // Для пустого массива может быть равен (или не равен) nullptr
-  Iterator begin() noexcept { return size_ ? &items_[0] : nullptr; }
+  Iterator begin() noexcept { return items_.Get(); }
 
   // Возвращает итератор на элемент, следующий за последним
   // Для пустого массива может быть равен (или не равен) nullptr
-  Iterator end() noexcept { return size_ ? &items_[size_] : nullptr; }
+  Iterator end() noexcept { return items_.Get() + size_; }
 
   // Возвращает константный итератор на начало массива
   // Для пустого массива может быть равен (или не равен) nullptr
@@ -119,41 +144,11 @@ public:
 
   // Возвращает константный итератор на начало массива
   // Для пустого массива может быть равен (или не равен) nullptr
-  ConstIterator cbegin() const noexcept { return size_ ? &items_[0] : nullptr; }
+  ConstIterator cbegin() const noexcept { return items_.Get(); }
 
   // Возвращает итератор на элемент, следующий за последним
   // Для пустого массива может быть равен (или не равен) nullptr
-  ConstIterator cend() const noexcept {
-    return size_ ? &items_[size_] : nullptr;
-  }
-
-  ~SimpleVector() {}
-
-  SimpleVector(const SimpleVector &other) : SimpleVector(other.size_) {
-    if (!other.IsEmpty()) {
-      std::copy(other.begin(), other.end(), items_.Get());
-    }
-  }
-
-  SimpleVector(SimpleVector &&other) noexcept
-      : items_(std::move(other.items_)), size_(other.size_),
-        capacity_(other.capacity_) {
-    other.size_ = 0;
-    other.capacity_ = 0;
-  }
-
-  SimpleVector &operator=(const SimpleVector &rhs) {
-    if (this == &rhs) {
-      return *this;
-    }
-    ArrayPtr<Type> new_items(rhs.size_);
-    std::copy(rhs.begin(), rhs.end(), new_items.Get());
-    using namespace std;
-    items_.swap(new_items);
-    size_ = rhs.size_;
-    capacity_ = rhs.size_;
-    return *this;
-  }
+  ConstIterator cend() const noexcept { return items_.Get() + size_; }
 
   // Добавляет элемент в конец вектора
   // При нехватке места увеличивает вдвое вместимость вектора
@@ -183,6 +178,10 @@ public:
   // вместимость вектора должна увеличиться вдвое, а для вектора вместимостью
   // 0 стать равной 1
   Iterator Insert(ConstIterator pos, const Type &value) {
+    // Строго говоря эта проверка ничего не гарантирует, так как в валидной
+    // программе всё и так работает, а в программе с UB нет никаких гарантий, но
+    // пусть будет.
+    assert((pos == nullptr && size_ == 0) || (pos >= begin() && pos <= end()));
     if (size_ == 0) {
       PushBack(value);
       return begin();
@@ -205,6 +204,10 @@ public:
   }
 
   Iterator Insert(ConstIterator pos, Type &&value) {
+    // Строго говоря эта проверка ничего не гарантирует, так как в валидной
+    // программе всё и так работает, а в программе с UB нет никаких гарантий, но
+    // пусть будет.
+    assert((pos == nullptr && size_ == 0) || (pos >= begin() && pos <= end()));
     if (size_ == 0) {
       PushBack(std::move(value));
       return begin();
@@ -231,7 +234,12 @@ public:
 
   // Удаляет элемент вектора в указанной позиции
   Iterator Erase(ConstIterator pos) {
+    // Строго говоря эта проверка ничего не гарантирует, так как в валидной
+    // программе всё и так работает, а в программе с UB нет никаких гарантий, но
+    // пусть будет.
+    assert(pos >= begin() && pos < end());
     size_t index = pos - begin();
+
     if (index == size_ - 1) {
       PopBack();
       return end();
@@ -243,7 +251,6 @@ public:
 
   // Обменивает значение с другим вектором
   void swap(SimpleVector &other) noexcept {
-    using namespace std;
     items_.swap(other.items_);
     std::swap(size_, other.size_);
     std::swap(capacity_, other.capacity_);
