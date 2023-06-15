@@ -196,7 +196,7 @@ public:
       if (index == size_ - 1) {
         PushBack(value);
       } else {
-        std::copy_backward(begin() + index, end() - 1, end());
+        std::move_backward(begin() + index, end(), end() + 1);
         items_[index] = value;
         size_++;
       }
